@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoJSON to KML Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            text-align: center;
+        }
+
+        #file-input {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #download-link {
+            display: none;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>GeoJSON to KML Converter</h1>
+    <p>Upload a GeoJSON file to convert it to KML format.</p>
+
+    <input type="file" id="file-input" accept="application/geo+json,application/json">
+    <button id="convert-button">Convert to KML</button>
+    <a id="download-link" href="#" download="output.kml">Download KML</a>
+
+    <script>
+        document.getElementById('convert-button').addEventListener('click', function () {
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files.length) {
+                alert('Please select a GeoJSON file first.');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                try {
+                    const geojson = JSON.parse(event.target.result);
+                    const kml = geojsonToKml(geojson);
+
+                    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+                    const downloadLink = document.getElementById('download-link');
+
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.style.display = 'inline';
+                } catch (error) {
+                    alert('Invalid GeoJSON file. Please upload a valid file.');
+                    console.error(error);
+                }
+            };
+
+            reader.readAsText(file);
+        });
+
+        function geojsonToKml(geojson) {
+            const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>`;
+            const kmlHeader = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
+            const kmlFooter = `</Document></kml>`;
+
+            let placemarks = '';
+
+            geojson.features.forEach(feature => {
+                const { geometry, properties } = feature;
+                const coords = geometry.coordinates;
+
+                let coordinates = '';
+                if (geometry.type === 'Point') {
+                    coordinates = `${coords[0]},${coords[1]}`;
+                } else if (geometry.type === 'LineString') {
+                    coordinates = coords.map(coord => `${coord[0]},${coord[1]}`).join(' ');
+                } else if (geometry.type === 'Polygon') {
+                    coordinates = coords[0].map(coord => `${coord[0]},${coord[1]}`).join(' ');
+                }
+
+                const name = properties.name || 'Unnamed Feature';
+
+                placemarks += `
+                    <Placemark>
+                        <name>${name}</name>
+                        <description><![CDATA[${JSON.stringify(properties)}]]></description>
+                        <${geometry.type}>
+                            <coordinates>${coordinates}</coordinates>
+                        </${geometry.type}>
+                    </Placemark>`;
+            });
+
+            return `${xmlHeader}
+${kmlHeader}
+${placemarks}
+${kmlFooter}`;
+        }
+    </script>
+</body>
+</html>
